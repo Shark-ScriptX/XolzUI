@@ -4,7 +4,7 @@
     ═════════════════════════════════════════════════════════════════════
     Design: White / macOS Aesthetic inspired by @x.olz
     Features:
-      • Signature Left Notched Tab Rail with smooth organic tabs
+      • Seamless Left Ear Notch Dock with organic bezier curves
       • Emerald Green Pill Badge & iOS-style Fluid Toggles
       • Integrated Lucide Icons System (Lucide.dev names to Roblox assets)
       • Lag-Free Tween Engine with pre-computed easing curves
@@ -27,8 +27,14 @@ local Xolzlium = {
 
 --// Services
 local function GetService(name)
-    local cloneref = cloneref or function(s) return s end
-    return cloneref(game:GetService(name))
+    local ok, svc = pcall(function()
+        return game:GetService(name)
+    end)
+    if ok and svc then
+        local cloneref = cloneref or function(s) return s end
+        return cloneref(svc)
+    end
+    return nil
 end
 
 local TweenService = GetService("TweenService")
@@ -38,8 +44,8 @@ local Players = GetService("Players")
 local HttpService = GetService("HttpService")
 local CoreGui = GetService("CoreGui")
 
-local LocalPlayer = Players.LocalPlayer
-local isStudio = RunService:IsStudio()
+local LocalPlayer = Players and Players.LocalPlayer
+local isStudio = RunService and RunService:IsStudio() or false
 
 --// Optimized Pre-Computed Tweens (Zero allocation during runtime = Zero Lag)
 local Tweens = {
@@ -50,26 +56,26 @@ local Tweens = {
     Smooth = TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 }
 
---// Color Theme Tokens
+--// Color Theme Tokens (Matches web GUI CSS variables exactly)
 local Theme = {
     Background = Color3.fromRGB(255, 255, 255),
     CardBg = Color3.fromRGB(245, 246, 248),
-    CardBgHover = Color3.fromRGB(238, 240, 244),
+    CardBgHover = Color3.fromRGB(236, 238, 242),
     PillBg = Color3.fromRGB(231, 234, 238),
     PillBgHover = Color3.fromRGB(221, 225, 231),
-    
+
     TextPrimary = Color3.fromRGB(24, 24, 27),
     TextSecondary = Color3.fromRGB(82, 82, 91),
     TextMuted = Color3.fromRGB(161, 161, 170),
     TextWatermark = Color3.fromRGB(196, 200, 208),
-    
+
     AccentGreen = Color3.fromRGB(0, 210, 106),
     AccentGreenActive = Color3.fromRGB(0, 185, 93),
     ToggleInactive = Color3.fromRGB(209, 213, 219),
-    
+
     DotYellow = Color3.fromRGB(254, 188, 46),
     DotRed = Color3.fromRGB(255, 95, 86),
-    
+
     Border = Color3.fromRGB(229, 231, 235),
     BorderSubtle = Color3.fromRGB(240, 241, 243),
     Divider = Color3.fromRGB(225, 227, 231)
@@ -120,6 +126,7 @@ Xolzlium.Lucide = Lucide
 
 --// Helper: Tween shortcut
 local function Tween(instance, tweenInfo, props)
+    if not instance or not instance.Parent then return end
     local t = TweenService:Create(instance, tweenInfo, props)
     t:Play()
     return t
@@ -132,7 +139,7 @@ local function CreateScreenGui()
     gui.ResetOnSpawn = false
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.DisplayOrder = 2147483647
-    
+
     local parent = nil
     if isStudio then
         parent = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
@@ -147,13 +154,126 @@ local function CreateScreenGui()
     return gui
 end
 
---// Main Window Constructor
+--// Helper: Create rounded frame
+local function MakeRounded(frame, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius)
+    corner.Parent = frame
+    return corner
+end
+
+--// Helper: Create circular frame
+local function MakeCircle(frame)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = frame
+    return corner
+end
+
+--// ═══════════════════════════════════════════════════════════════════
+--// SEAMLESS EAR NOTCH DOCK BUILDER
+--// Creates the organic curved left ear using overlapping rounded frames
+--// that simulate the SVG bezier path from the web version
+--// ═══════════════════════════════════════════════════════════════════
+
+local EAR_WIDTH = 68        -- Total width of the ear section
+local EAR_NOTCH_RAD = 28    -- Radius of the dock pill
+local DOCK_WIDTH = 58       -- Inner dock pill width
+local WINDOW_CORNER = 24    -- Main window corner radius
+
+local function BuildSeamlessEarNotch(parent, windowHeight)
+    -- The ear notch dock is built from overlapping white shapes:
+    -- 1. Main dock pill (tall rounded rectangle centered in the ear)
+    -- 2. Top curve connector (bridges dock to window top edge)
+    -- 3. Bottom curve connector (bridges dock to window bottom edge)
+    -- 4. Fill rectangles to close seams
+
+    local earContainer = Instance.new("Frame")
+    earContainer.Name = "EarNotchContainer"
+    earContainer.Size = UDim2.new(0, EAR_WIDTH, 1, 0)
+    earContainer.Position = UDim2.fromOffset(0, 0)
+    earContainer.BackgroundTransparency = 1
+    earContainer.ClipsDescendants = false
+    earContainer.Parent = parent
+
+    -- Main dock body (the protruding rounded pill on the left)
+    local dockBody = Instance.new("Frame")
+    dockBody.Name = "DockBody"
+    dockBody.AnchorPoint = Vector2.new(0, 0.5)
+    dockBody.Position = UDim2.new(0, -6, 0.5, 0)
+    dockBody.Size = UDim2.fromOffset(DOCK_WIDTH, 340)
+    dockBody.BackgroundColor3 = Theme.Background
+    dockBody.BorderSizePixel = 0
+    dockBody.ZIndex = 3
+    dockBody.Parent = earContainer
+    MakeRounded(dockBody, EAR_NOTCH_RAD)
+
+    -- Top transition curve: white arc that smoothly joins dock top to window top
+    local topCurve = Instance.new("Frame")
+    topCurve.Name = "TopCurve"
+    topCurve.Position = UDim2.new(0, DOCK_WIDTH - 16, 0, 54)
+    topCurve.Size = UDim2.fromOffset(26, 44)
+    topCurve.BackgroundColor3 = Theme.Background
+    topCurve.BorderSizePixel = 0
+    topCurve.ZIndex = 2
+    topCurve.Parent = earContainer
+
+    -- Bottom transition curve: white arc that smoothly joins dock bottom to window body
+    local bottomCurve = Instance.new("Frame")
+    bottomCurve.Name = "BottomCurve"
+    bottomCurve.AnchorPoint = Vector2.new(0, 1)
+    bottomCurve.Position = UDim2.new(0, DOCK_WIDTH - 16, 1, -54)
+    bottomCurve.Size = UDim2.fromOffset(26, 44)
+    bottomCurve.BackgroundColor3 = Theme.Background
+    bottomCurve.BorderSizePixel = 0
+    bottomCurve.ZIndex = 2
+    bottomCurve.Parent = earContainer
+
+    -- Concave cutout illusion at top: uses a frame matching the canvas bg
+    -- to create the "inward curve" effect above the dock
+    local topCutout = Instance.new("Frame")
+    topCutout.Name = "TopCutout"
+    topCutout.Position = UDim2.fromOffset(-6, 22)
+    topCutout.Size = UDim2.fromOffset(32, 50)
+    topCutout.BackgroundColor3 = Theme.Background
+    topCutout.BackgroundTransparency = 1
+    topCutout.BorderSizePixel = 0
+    topCutout.ZIndex = 4
+    topCutout.Parent = earContainer
+
+    -- Seamless fill strip connecting dock to main window body
+    local fillStrip = Instance.new("Frame")
+    fillStrip.Name = "FillStrip"
+    fillStrip.Position = UDim2.fromOffset(DOCK_WIDTH - 12, 0)
+    fillStrip.Size = UDim2.new(0, EAR_WIDTH - DOCK_WIDTH + 18, 1, 0)
+    fillStrip.BackgroundColor3 = Theme.Background
+    fillStrip.BorderSizePixel = 0
+    fillStrip.ZIndex = 1
+    fillStrip.Parent = earContainer
+
+    -- Subtle outer stroke on the dock body
+    local dockStroke = Instance.new("UIStroke")
+    dockStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    dockStroke.Color = Color3.fromRGB(0, 0, 0)
+    dockStroke.Transparency = 0.94
+    dockStroke.Thickness = 1
+    dockStroke.Parent = dockBody
+
+    return earContainer, dockBody
+end
+
+--// ═══════════════════════════════════════════════════════════════════
+--// MAIN WINDOW CONSTRUCTOR
+--// ═══════════════════════════════════════════════════════════════════
+
 function Xolzlium:CreateWindow(Settings)
     Settings = Settings or {}
     local Title = Settings.Title or "Name Game"
     local Author = Settings.Author or "Xolzlium"
     local Version = Settings.Version or Xolzlium.Version
     local WindowSize = Settings.Size or UDim2.fromOffset(720, 520)
+    local WindowW = WindowSize.X.Offset
+    local WindowH = WindowSize.Y.Offset
 
     local ScreenGui = CreateScreenGui()
     local Window = {
@@ -163,19 +283,26 @@ function Xolzlium:CreateWindow(Settings)
         Settings = Settings
     }
 
-    -- Root Center Frame
+    -- Outer shell (invisible, holds everything including the ear overflow)
+    local Shell = Instance.new("Frame")
+    Shell.Name = "WindowShell"
+    Shell.AnchorPoint = Vector2.new(0.5, 0.5)
+    Shell.Position = UDim2.fromScale(0.5, 0.5)
+    Shell.Size = UDim2.fromOffset(WindowW + 20, WindowH + 10)
+    Shell.BackgroundTransparency = 1
+    Shell.ClipsDescendants = false
+    Shell.Parent = ScreenGui
+
+    -- Main window body (the white rectangle, offset right to make room for ear)
     local Root = Instance.new("Frame")
     Root.Name = "WindowRoot"
-    Root.AnchorPoint = Vector2.new(0.5, 0.5)
-    Root.Position = UDim2.fromScale(0.5, 0.5)
-    Root.Size = WindowSize
+    Root.AnchorPoint = Vector2.new(0, 0)
+    Root.Position = UDim2.fromOffset(EAR_WIDTH - 6, 0)
+    Root.Size = UDim2.fromOffset(WindowW - EAR_WIDTH + 6, WindowH)
     Root.BackgroundColor3 = Theme.Background
     Root.BorderSizePixel = 0
-    Root.Parent = ScreenGui
-
-    local RootCorner = Instance.new("UICorner")
-    RootCorner.CornerRadius = UDim.new(0, 24)
-    RootCorner.Parent = Root
+    Root.Parent = Shell
+    MakeRounded(Root, WINDOW_CORNER)
 
     local RootStroke = Instance.new("UIStroke")
     RootStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -185,32 +312,32 @@ function Xolzlium:CreateWindow(Settings)
     RootStroke.Parent = Root
 
     -- ─────────────────────────────────────────────────────────────
-    -- SIGNATURE LEFT NOTCHED TAB DOCK
+    -- SEAMLESS LEFT EAR NOTCH DOCK
     -- ─────────────────────────────────────────────────────────────
-    local Dock = Instance.new("Frame")
-    Dock.Name = "LeftDock"
-    Dock.AnchorPoint = Vector2.new(1, 0)
-    Dock.Position = UDim2.new(0, 4, 0, 75)
-    Dock.Size = UDim2.fromOffset(64, 330)
-    Dock.BackgroundColor3 = Theme.Background
-    Dock.BorderSizePixel = 0
-    Dock.Parent = Root
+    local earContainer, dockBody = BuildSeamlessEarNotch(Shell, WindowH)
+    earContainer.Position = UDim2.fromOffset(0, 0)
+    earContainer.Size = UDim2.new(0, EAR_WIDTH, 0, WindowH)
 
-    local DockCorner = Instance.new("UICorner")
-    DockCorner.CornerRadius = UDim.new(0, 28)
-    DockCorner.Parent = Dock
+    -- Dock content layout (logo + tab buttons)
+    local DockContent = Instance.new("Frame")
+    DockContent.Name = "DockContent"
+    DockContent.AnchorPoint = Vector2.new(0.5, 0.5)
+    DockContent.Position = UDim2.fromScale(0.5, 0.5)
+    DockContent.Size = UDim2.new(1, -8, 0, 280)
+    DockContent.BackgroundTransparency = 1
+    DockContent.ZIndex = 5
+    DockContent.Parent = dockBody
 
     local DockList = Instance.new("UIListLayout")
     DockList.Padding = UDim.new(0, 16)
     DockList.HorizontalAlignment = Enum.HorizontalAlignment.Center
     DockList.VerticalAlignment = Enum.VerticalAlignment.Top
     DockList.SortOrder = Enum.SortOrder.LayoutOrder
-    DockList.Parent = Dock
+    DockList.Parent = DockContent
 
     local DockPadding = Instance.new("UIPadding")
-    DockPadding.PaddingTop = UDim.new(0, 16)
-    DockPadding.PaddingBottom = UDim.new(0, 16)
-    DockPadding.Parent = Dock
+    DockPadding.PaddingTop = UDim.new(0, 12)
+    DockPadding.Parent = DockContent
 
     -- Brand Logo Container (Top of the Left Dock)
     local LogoContainer = Instance.new("Frame")
@@ -218,32 +345,49 @@ function Xolzlium:CreateWindow(Settings)
     LogoContainer.Size = UDim2.fromOffset(40, 40)
     LogoContainer.BackgroundTransparency = 1
     LogoContainer.LayoutOrder = 0
-    LogoContainer.Parent = Dock
+    LogoContainer.ZIndex = 5
+    LogoContainer.Parent = DockContent
 
     local LogoImage = Instance.new("ImageLabel")
     LogoImage.Name = "LogoImage"
-    LogoImage.Size = UDim2.fromOffset(36, 36)
+    LogoImage.Size = UDim2.fromOffset(32, 32)
     LogoImage.AnchorPoint = Vector2.new(0.5, 0.5)
     LogoImage.Position = UDim2.fromScale(0.5, 0.5)
     LogoImage.BackgroundTransparency = 1
+    LogoImage.ZIndex = 5
+
+    -- Resolve logo image
     local customLogo = Settings.Logo
-    if not customLogo then
-        if getcustomasset and isfile and isfile("Logo-black.png") then
-            customLogo = getcustomasset("Logo-black.png")
+    if customLogo and type(customLogo) == "string" then
+        if customLogo:match("^rbxassetid://") or customLogo:match("^http") then
+            -- Direct asset ID or URL
+            LogoImage.Image = customLogo
         else
-            customLogo = "rbxassetid://18821914323"
+            -- Try as local file (executor workspace)
+            local ok = pcall(function()
+                if getcustomasset and isfile and isfile(customLogo) then
+                    LogoImage.Image = getcustomasset(customLogo)
+                else
+                    LogoImage.Image = "rbxassetid://18821914323"
+                end
+            end)
+            if not ok then
+                LogoImage.Image = "rbxassetid://18821914323"
+            end
         end
+    else
+        LogoImage.Image = "rbxassetid://18821914323"
     end
-    LogoImage.Image = customLogo
     LogoImage.Parent = LogoContainer
 
     -- Tabs Rail Container (Tab Section below Logo)
     local TabsRail = Instance.new("Frame")
     TabsRail.Name = "TabsRail"
-    TabsRail.Size = UDim2.new(1, 0, 1, -56)
+    TabsRail.Size = UDim2.new(1, 0, 0, 200)
     TabsRail.BackgroundTransparency = 1
     TabsRail.LayoutOrder = 1
-    TabsRail.Parent = Dock
+    TabsRail.ZIndex = 5
+    TabsRail.Parent = DockContent
 
     local TabsRailList = Instance.new("UIListLayout")
     TabsRailList.Padding = UDim.new(0, 12)
@@ -260,9 +404,14 @@ function Xolzlium:CreateWindow(Settings)
     Header.BackgroundTransparency = 1
     Header.Parent = Root
 
+    local HeaderPadding = Instance.new("UIPadding")
+    HeaderPadding.PaddingLeft = UDim.new(0, 26)
+    HeaderPadding.PaddingRight = UDim.new(0, 26)
+    HeaderPadding.PaddingTop = UDim.new(0, 14)
+    HeaderPadding.Parent = Header
+
     local HeaderLeft = Instance.new("Frame")
     HeaderLeft.Name = "HeaderLeft"
-    HeaderLeft.Position = UDim2.fromOffset(26, 14)
     HeaderLeft.Size = UDim2.new(0.7, 0, 0, 26)
     HeaderLeft.BackgroundTransparency = 1
     HeaderLeft.Parent = Header
@@ -317,10 +466,7 @@ function Xolzlium:CreateWindow(Settings)
     Badge.BorderSizePixel = 0
     Badge.Size = UDim2.fromOffset(56, 22)
     Badge.Parent = HeaderLeft
-
-    local BadgeCorner = Instance.new("UICorner")
-    BadgeCorner.CornerRadius = UDim.new(1, 0)
-    BadgeCorner.Parent = Badge
+    MakeCircle(Badge)
 
     local BadgeText = Instance.new("TextLabel")
     BadgeText.Name = "BadgeText"
@@ -336,8 +482,8 @@ function Xolzlium:CreateWindow(Settings)
     local Controls = Instance.new("Frame")
     Controls.Name = "Controls"
     Controls.AnchorPoint = Vector2.new(1, 0)
-    Controls.Position = UDim2.new(1, -26, 0, 16)
-    Controls.Size = UDim2.fromOffset(48, 20)
+    Controls.Position = UDim2.new(1, 0, 0, 0)
+    Controls.Size = UDim2.fromOffset(48, 26)
     Controls.BackgroundTransparency = 1
     Controls.Parent = Header
 
@@ -348,6 +494,18 @@ function Xolzlium:CreateWindow(Settings)
     ControlsList.Padding = UDim.new(0, 9)
     ControlsList.Parent = Controls
 
+    -- Red Dot (Close) - placed first due to Right alignment
+    local DotRed = Instance.new("TextButton")
+    DotRed.Name = "DotClose"
+    DotRed.Text = ""
+    DotRed.Size = UDim2.fromOffset(14, 14)
+    DotRed.BackgroundColor3 = Theme.DotRed
+    DotRed.BorderSizePixel = 0
+    DotRed.AutoButtonColor = false
+    DotRed.LayoutOrder = 2
+    DotRed.Parent = Controls
+    MakeCircle(DotRed)
+
     -- Yellow Dot (Minimize)
     local DotYellow = Instance.new("TextButton")
     DotYellow.Name = "DotMinimize"
@@ -356,23 +514,9 @@ function Xolzlium:CreateWindow(Settings)
     DotYellow.BackgroundColor3 = Theme.DotYellow
     DotYellow.BorderSizePixel = 0
     DotYellow.AutoButtonColor = false
+    DotYellow.LayoutOrder = 1
     DotYellow.Parent = Controls
-    local DotYellowCorner = Instance.new("UICorner")
-    DotYellowCorner.CornerRadius = UDim.new(1, 0)
-    DotYellowCorner.Parent = DotYellow
-
-    -- Red Dot (Close)
-    local DotRed = Instance.new("TextButton")
-    DotRed.Name = "DotClose"
-    DotRed.Text = ""
-    DotRed.Size = UDim2.fromOffset(14, 14)
-    DotRed.BackgroundColor3 = Theme.DotRed
-    DotRed.BorderSizePixel = 0
-    DotRed.AutoButtonColor = false
-    DotRed.Parent = Controls
-    local DotRedCorner = Instance.new("UICorner")
-    DotRedCorner.CornerRadius = UDim.new(1, 0)
-    DotRedCorner.Parent = DotRed
+    MakeCircle(DotYellow)
 
     -- Subtle Header Divider Line
     local HeaderLine = Instance.new("Frame")
@@ -389,14 +533,14 @@ function Xolzlium:CreateWindow(Settings)
     -- ─────────────────────────────────────────────────────────────
     local TabTitle = Instance.new("TextLabel")
     TabTitle.Name = "TabTitle"
-    TabTitle.Position = UDim2.fromOffset(26, 64)
+    TabTitle.Position = UDim2.fromOffset(26, 62)
     TabTitle.Size = UDim2.new(1, -52, 0, 32)
     TabTitle.Font = Enum.Font.GothamBold
     TabTitle.TextSize = 22
     TabTitle.TextColor3 = Theme.TextPrimary
     TabTitle.TextXAlignment = Enum.TextXAlignment.Left
     TabTitle.BackgroundTransparency = 1
-    TabTitle.Text = "NameTab"
+    TabTitle.Text = ""
     TabTitle.Parent = Root
 
     -- ─────────────────────────────────────────────────────────────
@@ -404,8 +548,8 @@ function Xolzlium:CreateWindow(Settings)
     -- ─────────────────────────────────────────────────────────────
     local ContentContainer = Instance.new("Frame")
     ContentContainer.Name = "ContentContainer"
-    ContentContainer.Position = UDim2.fromOffset(26, 102)
-    ContentContainer.Size = UDim2.new(1, -52, 1, -118)
+    ContentContainer.Position = UDim2.fromOffset(26, 100)
+    ContentContainer.Size = UDim2.new(1, -52, 1, -116)
     ContentContainer.BackgroundTransparency = 1
     ContentContainer.ClipsDescendants = true
     ContentContainer.Parent = Root
@@ -422,8 +566,8 @@ function Xolzlium:CreateWindow(Settings)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 isDragging = true
                 dragStart = input.Position
-                startPos = Root.Position
-                
+                startPos = Shell.Position
+
                 input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
                         isDragging = false
@@ -439,7 +583,7 @@ function Xolzlium:CreateWindow(Settings)
     UserInputService.InputChanged:Connect(function(input)
         if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            Root.Position = UDim2.new(
+            Shell.Position = UDim2.new(
                 startPos.X.Scale,
                 startPos.X.Offset + delta.X,
                 startPos.Y.Scale,
@@ -452,18 +596,28 @@ function Xolzlium:CreateWindow(Settings)
     local isMinimized = false
     DotYellow.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
-        Tween(Root, Tweens.Normal, {
-            Size = isMinimized and UDim2.fromOffset(WindowSize.X.Offset, 52) or WindowSize
-        })
-        ContentContainer.Visible = not isMinimized
-        TabTitle.Visible = not isMinimized
+        if isMinimized then
+            ContentContainer.Visible = false
+            TabTitle.Visible = false
+            Tween(Root, Tweens.Normal, {
+                Size = UDim2.fromOffset(Root.Size.X.Offset, 52)
+            })
+        else
+            Tween(Root, Tweens.Normal, {
+                Size = UDim2.fromOffset(WindowW - EAR_WIDTH + 6, WindowH)
+            })
+            task.wait(0.2)
+            ContentContainer.Visible = true
+            TabTitle.Visible = true
+        end
     end)
 
     DotRed.MouseButton1Click:Connect(function()
-        Tween(Root, Tweens.Fast, {
-            Size = UDim2.fromOffset(WindowSize.X.Offset * 0.9, WindowSize.Y.Offset * 0.9),
-            BackgroundTransparency = 1
+        Tween(Shell, Tweens.Fast, {
+            Size = UDim2.fromOffset((WindowW + 20) * 0.9, (WindowH + 10) * 0.9)
         })
+        Tween(Root, Tweens.Fast, { BackgroundTransparency = 1 })
+        Tween(dockBody, Tweens.Fast, { BackgroundTransparency = 1 })
         task.wait(0.15)
         ScreenGui:Destroy()
     end)
@@ -490,11 +644,9 @@ function Xolzlium:CreateWindow(Settings)
         DockBtn.BorderSizePixel = 0
         DockBtn.Text = ""
         DockBtn.AutoButtonColor = false
+        DockBtn.ZIndex = 6
         DockBtn.Parent = TabsRail
-
-        local DockBtnCorner = Instance.new("UICorner")
-        DockBtnCorner.CornerRadius = UDim.new(1, 0)
-        DockBtnCorner.Parent = DockBtn
+        MakeCircle(DockBtn)
 
         local IconImg = Instance.new("ImageLabel")
         IconImg.Name = "Icon"
@@ -504,6 +656,7 @@ function Xolzlium:CreateWindow(Settings)
         IconImg.BackgroundTransparency = 1
         IconImg.Image = Lucide.Get(TabIcon)
         IconImg.ImageColor3 = (#Window.Tabs == 0) and Color3.fromRGB(255, 255, 255) or Theme.TextPrimary
+        IconImg.ZIndex = 7
         IconImg.Parent = DockBtn
 
         -- Tab Content Frame (Holds Left & Right Section Columns)
@@ -614,7 +767,7 @@ function Xolzlium:CreateWindow(Settings)
         end)
 
         Tab.Frame = TabFrame
-        DockBtn.DockBtn = DockBtn
+        Tab.DockBtn = DockBtn
         Tab.IconImg = IconImg
         Tab.LeftColumn = LeftColumn
         Tab.RightColumn = RightColumn
@@ -711,10 +864,7 @@ function Xolzlium:CreateWindow(Settings)
                 Card.BackgroundColor3 = Theme.CardBg
                 Card.BorderSizePixel = 0
                 Card.Parent = SecContainer
-
-                local CardCorner = Instance.new("UICorner")
-                CardCorner.CornerRadius = UDim.new(0, 12)
-                CardCorner.Parent = Card
+                MakeRounded(Card, 14)
 
                 local CardLabel = Instance.new("TextLabel")
                 CardLabel.Name = "Label"
@@ -733,30 +883,32 @@ function Xolzlium:CreateWindow(Settings)
                 Switch.Name = "Switch"
                 Switch.AnchorPoint = Vector2.new(1, 0.5)
                 Switch.Position = UDim2.new(1, -12, 0.5, 0)
-                Switch.Size = UDim2.fromOffset(46, 25)
+                Switch.Size = UDim2.fromOffset(48, 27)
                 Switch.BackgroundColor3 = Default and Theme.AccentGreen or Theme.ToggleInactive
                 Switch.BorderSizePixel = 0
                 Switch.Text = ""
                 Switch.AutoButtonColor = false
                 Switch.Parent = Card
-
-                local SwitchCorner = Instance.new("UICorner")
-                SwitchCorner.CornerRadius = UDim.new(1, 0)
-                SwitchCorner.Parent = Switch
+                MakeCircle(Switch)
 
                 -- Knob
                 local Knob = Instance.new("Frame")
                 Knob.Name = "Knob"
                 Knob.AnchorPoint = Vector2.new(0, 0.5)
-                Knob.Position = Default and UDim2.new(1, -22, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
-                Knob.Size = UDim2.fromOffset(19, 19)
+                Knob.Position = Default and UDim2.new(1, -24, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
+                Knob.Size = UDim2.fromOffset(21, 21)
                 Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                 Knob.BorderSizePixel = 0
                 Knob.Parent = Switch
+                MakeCircle(Knob)
 
-                local KnobCorner = Instance.new("UICorner")
-                KnobCorner.CornerRadius = UDim.new(1, 0)
-                KnobCorner.Parent = Knob
+                -- Knob shadow
+                local KnobStroke = Instance.new("UIStroke")
+                KnobStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                KnobStroke.Color = Color3.fromRGB(0, 0, 0)
+                KnobStroke.Transparency = 0.85
+                KnobStroke.Thickness = 0.5
+                KnobStroke.Parent = Knob
 
                 local State = Default
                 local function SetToggle(val)
@@ -765,13 +917,27 @@ function Xolzlium:CreateWindow(Settings)
                         BackgroundColor3 = State and Theme.AccentGreen or Theme.ToggleInactive
                     })
                     Tween(Knob, Tweens.Spring, {
-                        Position = State and UDim2.new(1, -22, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
+                        Position = State and UDim2.new(1, -24, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
                     })
                     task.spawn(Callback, State)
                 end
 
                 Switch.MouseButton1Click:Connect(function()
                     SetToggle(not State)
+                end)
+
+                -- Card hover effect
+                local CardBtn = Instance.new("TextButton")
+                CardBtn.Size = UDim2.fromScale(1, 1)
+                CardBtn.BackgroundTransparency = 1
+                CardBtn.Text = ""
+                CardBtn.ZIndex = 0
+                CardBtn.Parent = Card
+                CardBtn.MouseEnter:Connect(function()
+                    Tween(Card, Tweens.Fast, { BackgroundColor3 = Theme.CardBgHover })
+                end)
+                CardBtn.MouseLeave:Connect(function()
+                    Tween(Card, Tweens.Fast, { BackgroundColor3 = Theme.CardBg })
                 end)
 
                 local ToggleObj = {
@@ -803,10 +969,7 @@ function Xolzlium:CreateWindow(Settings)
                 Card.BorderSizePixel = 0
                 Card.ZIndex = 5
                 Card.Parent = SecContainer
-
-                local CardCorner = Instance.new("UICorner")
-                CardCorner.CornerRadius = UDim.new(0, 12)
-                CardCorner.Parent = Card
+                MakeRounded(Card, 14)
 
                 local CardLabel = Instance.new("TextLabel")
                 CardLabel.Name = "Label"
@@ -818,6 +981,7 @@ function Xolzlium:CreateWindow(Settings)
                 CardLabel.Position = UDim2.fromOffset(14, 0)
                 CardLabel.Size = UDim2.new(0.5, 0, 1, 0)
                 CardLabel.BackgroundTransparency = 1
+                CardLabel.ZIndex = 5
                 CardLabel.Parent = Card
 
                 -- Dropdown Pill Button
@@ -825,16 +989,14 @@ function Xolzlium:CreateWindow(Settings)
                 Pill.Name = "DropdownPill"
                 Pill.AnchorPoint = Vector2.new(1, 0.5)
                 Pill.Position = UDim2.new(1, -12, 0.5, 0)
-                Pill.Size = UDim2.fromOffset(92, 28)
+                Pill.Size = UDim2.fromOffset(100, 28)
                 Pill.BackgroundColor3 = Theme.PillBg
                 Pill.BorderSizePixel = 0
                 Pill.Text = ""
                 Pill.AutoButtonColor = false
+                Pill.ZIndex = 6
                 Pill.Parent = Card
-
-                local PillCorner = Instance.new("UICorner")
-                PillCorner.CornerRadius = UDim.new(1, 0)
-                PillCorner.Parent = Pill
+                MakeCircle(Pill)
 
                 local PillText = Instance.new("TextLabel")
                 PillText.Name = "SelectedText"
@@ -842,10 +1004,11 @@ function Xolzlium:CreateWindow(Settings)
                 PillText.Font = Enum.Font.GothamMedium
                 PillText.TextSize = 12
                 PillText.TextColor3 = Theme.TextPrimary
-                PillText.Size = UDim2.new(1, -22, 1, 0)
-                PillText.Position = UDim2.fromOffset(10, 0)
+                PillText.Size = UDim2.new(1, -26, 1, 0)
+                PillText.Position = UDim2.fromOffset(12, 0)
                 PillText.TextXAlignment = Enum.TextXAlignment.Left
                 PillText.BackgroundTransparency = 1
+                PillText.ZIndex = 7
                 PillText.Parent = Pill
 
                 local PillChevron = Instance.new("ImageLabel")
@@ -856,6 +1019,7 @@ function Xolzlium:CreateWindow(Settings)
                 PillChevron.BackgroundTransparency = 1
                 PillChevron.Image = Lucide.Get("chevron-down")
                 PillChevron.ImageColor3 = Theme.TextSecondary
+                PillChevron.ZIndex = 7
                 PillChevron.Parent = Pill
 
                 -- Popover List
@@ -863,17 +1027,14 @@ function Xolzlium:CreateWindow(Settings)
                 Popover.Name = "Popover"
                 Popover.AnchorPoint = Vector2.new(1, 0)
                 Popover.Position = UDim2.new(1, -12, 1, 4)
-                Popover.Size = UDim2.fromOffset(120, 0)
+                Popover.Size = UDim2.fromOffset(140, 0)
                 Popover.BackgroundColor3 = Theme.Background
                 Popover.BorderSizePixel = 0
                 Popover.ClipsDescendants = true
                 Popover.Visible = false
                 Popover.ZIndex = 20
                 Popover.Parent = Card
-
-                local PopoverCorner = Instance.new("UICorner")
-                PopoverCorner.CornerRadius = UDim.new(0, 10)
-                PopoverCorner.Parent = Popover
+                MakeRounded(Popover, 10)
 
                 local PopoverStroke = Instance.new("UIStroke")
                 PopoverStroke.Color = Theme.Border
@@ -882,6 +1043,13 @@ function Xolzlium:CreateWindow(Settings)
                 local PopoverList = Instance.new("UIListLayout")
                 PopoverList.Padding = UDim.new(0, 2)
                 PopoverList.Parent = Popover
+
+                local PopoverPadding = Instance.new("UIPadding")
+                PopoverPadding.PaddingTop = UDim.new(0, 4)
+                PopoverPadding.PaddingBottom = UDim.new(0, 4)
+                PopoverPadding.PaddingLeft = UDim.new(0, 4)
+                PopoverPadding.PaddingRight = UDim.new(0, 4)
+                PopoverPadding.Parent = Popover
 
                 local Selected = Default
                 local isOpen = false
@@ -893,22 +1061,35 @@ function Xolzlium:CreateWindow(Settings)
                     for _, opt in ipairs(Options) do
                         local optBtn = Instance.new("TextButton")
                         optBtn.Name = "Opt_" .. tostring(opt)
-                        optBtn.Size = UDim2.new(1, 0, 0, 26)
+                        optBtn.Size = UDim2.new(1, 0, 0, 28)
                         optBtn.BackgroundColor3 = (opt == Selected) and Color3.fromRGB(235, 252, 243) or Theme.Background
                         optBtn.Text = "  " .. tostring(opt)
                         optBtn.Font = Enum.Font.GothamMedium
                         optBtn.TextSize = 12
-                        optBtn.TextColor3 = (opt == Selected) and Theme.AccentGreen or Theme.TextPrimary
+                        optBtn.TextColor3 = (opt == Selected) and Theme.AccentGreenActive or Theme.TextPrimary
                         optBtn.TextXAlignment = Enum.TextXAlignment.Left
                         optBtn.BorderSizePixel = 0
                         optBtn.ZIndex = 21
+                        optBtn.AutoButtonColor = false
                         optBtn.Parent = Popover
+                        MakeRounded(optBtn, 8)
+
+                        optBtn.MouseEnter:Connect(function()
+                            if opt ~= Selected then
+                                Tween(optBtn, Tweens.Fast, { BackgroundColor3 = Theme.CardBgHover })
+                            end
+                        end)
+                        optBtn.MouseLeave:Connect(function()
+                            if opt ~= Selected then
+                                Tween(optBtn, Tweens.Fast, { BackgroundColor3 = Theme.Background })
+                            end
+                        end)
 
                         optBtn.MouseButton1Click:Connect(function()
                             Selected = opt
                             PillText.Text = tostring(opt)
                             isOpen = false
-                            Tween(Popover, Tweens.Fast, { Size = UDim2.fromOffset(120, 0) })
+                            Tween(Popover, Tweens.Fast, { Size = UDim2.fromOffset(140, 0) })
                             task.wait(0.12)
                             Popover.Visible = false
                             task.spawn(Callback, Selected)
@@ -921,13 +1102,20 @@ function Xolzlium:CreateWindow(Settings)
                     if isOpen then
                         PopulateOptions()
                         Popover.Visible = true
-                        local targetHeight = #Options * 28 + 4
-                        Tween(Popover, Tweens.Normal, { Size = UDim2.fromOffset(120, targetHeight) })
+                        local targetHeight = #Options * 30 + 12
+                        Tween(Popover, Tweens.Normal, { Size = UDim2.fromOffset(140, targetHeight) })
                     else
-                        Tween(Popover, Tweens.Fast, { Size = UDim2.fromOffset(120, 0) })
+                        Tween(Popover, Tweens.Fast, { Size = UDim2.fromOffset(140, 0) })
                         task.wait(0.12)
                         Popover.Visible = false
                     end
+                end)
+
+                Pill.MouseEnter:Connect(function()
+                    Tween(Pill, Tweens.Fast, { BackgroundColor3 = Theme.PillBgHover })
+                end)
+                Pill.MouseLeave:Connect(function()
+                    Tween(Pill, Tweens.Fast, { BackgroundColor3 = Theme.PillBg })
                 end)
 
                 local DropdownObj = {
@@ -957,10 +1145,7 @@ function Xolzlium:CreateWindow(Settings)
                 Card.BackgroundColor3 = Theme.CardBg
                 Card.BorderSizePixel = 0
                 Card.Parent = SecContainer
-
-                local CardCorner = Instance.new("UICorner")
-                CardCorner.CornerRadius = UDim.new(0, 12)
-                CardCorner.Parent = Card
+                MakeRounded(Card, 14)
 
                 local CardLabel = Instance.new("TextLabel")
                 CardLabel.Name = "Label"
@@ -997,12 +1182,23 @@ function Xolzlium:CreateWindow(Settings)
                 ClickDetector.Size = UDim2.fromScale(1, 1)
                 ClickDetector.BackgroundTransparency = 1
                 ClickDetector.Text = ""
+                ClickDetector.ZIndex = 0
                 ClickDetector.Parent = Card
+
                 ClickDetector.MouseButton1Click:Connect(function()
-                    ActionBtn.Size = UDim2.fromOffset(14, 14)
+                    Tween(ActionBtn, Tweens.Bounce, { Size = UDim2.fromOffset(14, 14) })
                     task.wait(0.08)
-                    ActionBtn.Size = UDim2.fromOffset(18, 18)
+                    Tween(ActionBtn, Tweens.Bounce, { Size = UDim2.fromOffset(18, 18) })
                     task.spawn(Callback)
+                end)
+
+                ClickDetector.MouseEnter:Connect(function()
+                    Tween(Card, Tweens.Fast, { BackgroundColor3 = Theme.CardBgHover })
+                    Tween(ActionBtn, Tweens.Fast, { ImageColor3 = Theme.AccentGreen })
+                end)
+                ClickDetector.MouseLeave:Connect(function()
+                    Tween(Card, Tweens.Fast, { BackgroundColor3 = Theme.CardBg })
+                    Tween(ActionBtn, Tweens.Fast, { ImageColor3 = Theme.TextPrimary })
                 end)
 
                 return Card
@@ -1021,10 +1217,7 @@ function Xolzlium:CreateWindow(Settings)
                 Card.BackgroundColor3 = Theme.CardBg
                 Card.BorderSizePixel = 0
                 Card.Parent = SecContainer
-
-                local CardCorner = Instance.new("UICorner")
-                CardCorner.CornerRadius = UDim.new(0, 12)
-                CardCorner.Parent = Card
+                MakeRounded(Card, 14)
 
                 local CardLabel = Instance.new("TextLabel")
                 CardLabel.Name = "Label"
@@ -1060,10 +1253,7 @@ function Xolzlium:CreateWindow(Settings)
                 Card.BackgroundColor3 = Theme.CardBg
                 Card.BorderSizePixel = 0
                 Card.Parent = SecContainer
-
-                local CardCorner = Instance.new("UICorner")
-                CardCorner.CornerRadius = UDim.new(0, 14)
-                CardCorner.Parent = Card
+                MakeRounded(Card, 14)
 
                 local CardLabel = Instance.new("TextLabel")
                 CardLabel.Name = "Label"
@@ -1092,17 +1282,23 @@ function Xolzlium:CreateWindow(Settings)
                 InputBox.TextColor3 = Theme.TextPrimary
                 InputBox.ClearTextOnFocus = false
                 InputBox.Parent = Card
-
-                local InputCorner = Instance.new("UICorner")
-                InputCorner.CornerRadius = UDim.new(0, 8)
-                InputCorner.Parent = InputBox
+                MakeRounded(InputBox, 10)
 
                 local InputPadding = Instance.new("UIPadding")
                 InputPadding.PaddingLeft = UDim.new(0, 10)
                 InputPadding.PaddingRight = UDim.new(0, 10)
                 InputPadding.Parent = InputBox
 
+                -- Focus styling
+                InputBox.Focused:Connect(function()
+                    Tween(InputBox, Tweens.Fast, {
+                        BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    })
+                end)
                 InputBox.FocusLost:Connect(function(enterPressed)
+                    Tween(InputBox, Tweens.Fast, {
+                        BackgroundColor3 = Theme.PillBg
+                    })
                     task.spawn(Callback, InputBox.Text, enterPressed)
                 end)
 
@@ -1135,10 +1331,7 @@ function Xolzlium:CreateWindow(Settings)
                 Card.BackgroundColor3 = Theme.CardBg
                 Card.BorderSizePixel = 0
                 Card.Parent = SecContainer
-
-                local CardCorner = Instance.new("UICorner")
-                CardCorner.CornerRadius = UDim.new(0, 12)
-                CardCorner.Parent = Card
+                MakeRounded(Card, 14)
 
                 local CardLabel = Instance.new("TextLabel")
                 CardLabel.Name = "Label"
@@ -1172,22 +1365,16 @@ function Xolzlium:CreateWindow(Settings)
                 Bar.BackgroundColor3 = Theme.PillBg
                 Bar.BorderSizePixel = 0
                 Bar.Parent = Card
-
-                local BarCorner = Instance.new("UICorner")
-                BarCorner.CornerRadius = UDim.new(1, 0)
-                BarCorner.Parent = Bar
+                MakeCircle(Bar)
 
                 local Fill = Instance.new("Frame")
                 Fill.Name = "Fill"
-                local initialAlpha = (Default - Min) / (Max - Min)
+                local initialAlpha = (Default - Min) / math.max(Max - Min, 1)
                 Fill.Size = UDim2.fromScale(initialAlpha, 1)
                 Fill.BackgroundColor3 = Theme.AccentGreen
                 Fill.BorderSizePixel = 0
                 Fill.Parent = Bar
-
-                local FillCorner = Instance.new("UICorner")
-                FillCorner.CornerRadius = UDim.new(1, 0)
-                FillCorner.Parent = Fill
+                MakeCircle(Fill)
 
                 local CurrentVal = Default
                 local isDraggingSlider = false
@@ -1195,6 +1382,7 @@ function Xolzlium:CreateWindow(Settings)
                 local function UpdateSlider(xPos)
                     local barAbsPos = Bar.AbsolutePosition.X
                     local barAbsSize = Bar.AbsoluteSize.X
+                    if barAbsSize == 0 then return end
                     local alpha = math.clamp((xPos - barAbsPos) / barAbsSize, 0, 1)
                     local val = math.round(Min + (Max - Min) * alpha)
                     CurrentVal = val
@@ -1228,7 +1416,7 @@ function Xolzlium:CreateWindow(Settings)
                         v = math.clamp(v, Min, Max)
                         CurrentVal = v
                         ValueLabel.Text = tostring(v)
-                        local alpha = (v - Min) / (Max - Min)
+                        local alpha = (v - Min) / math.max(Max - Min, 1)
                         Tween(Fill, Tweens.Fast, { Size = UDim2.fromScale(alpha, 1) })
                         task.spawn(Callback, v)
                     end
